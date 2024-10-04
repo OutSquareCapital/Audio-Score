@@ -3,6 +3,8 @@
 
 This Python project allows for the analysis and visualization of audio files. The script can calculate degradation scores based on frequency quantiles and generate spectrograms for selected audio files. It also supports multiple audio formats (`.mp3`, `.wav`, `.flac`).
 
+The higher the score, the worse the quality.
+
 ## Features
 
 - **Audio Spectrogram Generation**: Calculates and visualizes the spectrogram (in dB) for audio files.
@@ -96,4 +98,4 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 ## Author
 
-- [Your Name](https://github.com/your-username)
+- [Stettler Thibaud](https://github.com/your-username)
