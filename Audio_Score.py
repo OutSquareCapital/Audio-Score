@@ -46,7 +46,7 @@ def calculate_audio_spectrogram(file_path: str) -> tuple[np.ndarray, int]:
     return spectrogram_db, sample_rate
 
 
-def definir_threshold_par_echelle(spectrogram_db: np.ndarray, fraction: float = 0.1) -> float:
+def set_threshold_by_scale(spectrogram_db: np.ndarray, fraction: float = 0.1) -> float:
     """
     Defines a dB threshold based on the scale of spectrogram values.
 
@@ -67,7 +67,7 @@ def definir_threshold_par_echelle(spectrogram_db: np.ndarray, fraction: float = 
     return threshold_db
 
 
-def quantifier_distribution_points_par_freq(spectrogram_db: np.ndarray, sample_rate: int, threshold_db: float, percentiles: list[int] = [25, 50, 75, 90]) -> dict[int, float]:
+def quantify_distribution_points_by_frequency(spectrogram_db: np.ndarray, sample_rate: int, threshold_db: float, percentiles: list[int] = [25, 50, 75, 90]) -> dict[int, float]:
     """
     Quantifies the distribution of significant points in the spectrogram relative to frequencies.
 
@@ -103,7 +103,7 @@ def quantifier_distribution_points_par_freq(spectrogram_db: np.ndarray, sample_r
 
     return frequency_percentiles
 
-def transformer_quantiles_en_dataframe(titles_quantiles_dict: dict[str, dict[int, float]]) -> pd.DataFrame:
+def transform_quantiles_to_dataframe(titles_quantiles_dict: dict[str, dict[int, float]]) -> pd.DataFrame:
     """
     Transforms a dictionary of frequency quantiles for each audio file into a DataFrame.
 
@@ -131,7 +131,7 @@ def transformer_quantiles_en_dataframe(titles_quantiles_dict: dict[str, dict[int
     return df
 
 
-def analyser_points_rupture(df_quantiles: pd.DataFrame) -> pd.DataFrame:
+def analyze_breakpoints(df_quantiles: pd.DataFrame) -> pd.DataFrame:
     """
     Analyzes the quantiles DataFrame to identify breakpoints using the first and second derivatives.
     Returns a DataFrame with six columns: "First Derivative Threshold", "Second Threshold First Derivative", "Third Threshold First Derivative",
@@ -248,7 +248,7 @@ def calculate_degradation_score(average_quantiles_series: pd.Series, reference_v
     return degradation_score_sorted
 
 
-def analyser_fichiers_audio(audio_file_paths: str, fraction: float = 0.1, percentiles: list[int] = [80, 81, 82, 83, 84, 85, 86, 87, 88 ,89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99]) -> pd.DataFrame:
+def analyze_audio_files(audio_file_paths: str, fraction: float = 0.1, percentiles: list[int] = [80, 81, 82, 83, 84, 85, 86, 87, 88 ,89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99]) -> pd.DataFrame:
     """
     Iterates through the audio files in a directory, calculates the spectrograms and frequency quantiles, 
     and returns a DataFrame with each audio file and its associated quantiles.
@@ -274,18 +274,18 @@ def analyser_fichiers_audio(audio_file_paths: str, fraction: float = 0.1, percen
         spectrogram_db, sample_rate = calculate_audio_spectrogram(file_path)
 
         # Define the threshold automatically based on the scale
-        threshold_db_value = definir_threshold_par_echelle(spectrogram_db, fraction=fraction)
+        threshold_db_value = set_threshold_by_scale(spectrogram_db, fraction=fraction)
 
         # Quantify the frequencies corresponding to the percentiles of the point distribution
-        frequency_percentiles = quantifier_distribution_points_par_freq(spectrogram_db, sample_rate, threshold_db=threshold_db_value, percentiles=percentiles)
+        frequency_percentiles = quantify_distribution_points_by_frequency(spectrogram_db, sample_rate, threshold_db=threshold_db_value, percentiles=percentiles)
 
         # Add the quantiles to the dictionary, using the file name as the key
         titles_quantiles_dict[filename] = frequency_percentiles
 
     # Convert the dictionary into a DataFrame
-    df_quantiles = transformer_quantiles_en_dataframe(titles_quantiles_dict)
+    df_quantiles = transform_quantiles_to_dataframe(titles_quantiles_dict)
 
-    df_rupture_treshold = analyser_points_rupture(df_quantiles)
+    df_rupture_treshold = analyze_breakpoints(df_quantiles)
 
     # Use the new function to extract the significant quantiles
     average_quantiles_per_title = extract_average_significant_quantiles(df_quantiles, df_rupture_treshold)
@@ -353,7 +353,7 @@ def analyse_and_plot(audio_directory: str, filename: str, filename_2: str,
 
     # Calculate and display the degradation score if requested
     if calculate_degradation:
-        degradation_score_per_title = analyser_fichiers_audio(audio_file_paths)
+        degradation_score_per_title = analyze_audio_files(audio_file_paths)
         print(degradation_score_per_title)
 
     # Display the spectrogram for the first file if requested
