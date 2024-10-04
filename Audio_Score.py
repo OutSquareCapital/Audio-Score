@@ -9,15 +9,15 @@ from matplotlib.colors import LinearSegmentedColormap
 
 def get_audio_file_paths(audio_directory: str) -> list[str]:
     """
-    Génère les chemins complets de tous les fichiers audio dans un répertoire.
+    Generates the full paths of all audio files in a directory.
 
     Parameters:
-    audio_directory (str): Chemin vers le répertoire contenant les fichiers audio.
+    audio_directory (str): Path to the directory containing audio files.
 
     Returns:
-    list[str]: Liste des chemins complets des fichiers audio (mp3, wav, flac).
+    list[str]: List of full paths to audio files (mp3, wav, flac).
     """
-    # Parcourir les fichiers audio dans le répertoire et créer la liste des chemins complets
+    # Iterate through the audio files in the directory and create a list of full paths
     audio_file_paths = [
         os.path.join(audio_directory, filename)
         for filename in os.listdir(audio_directory)
@@ -25,44 +25,43 @@ def get_audio_file_paths(audio_directory: str) -> list[str]:
     ]
     return audio_file_paths
 
-
 def calculate_audio_spectrogram(file_path: str) -> tuple[np.ndarray, int]:
     """
-    Charge un fichier audio et calcule son spectrogramme en dB.
+    Loads an audio file and calculates its spectrogram in dB.
 
     Parameters:
-    file_path (str): Chemin vers le fichier audio.
+    file_path (str): Path to the audio file.
 
     Returns:
-    tuple: Spectrogramme en dB (numpy.ndarray), fréquence d'échantillonnage (int)
+    tuple: Spectrogram in dB (numpy.ndarray), sample rate (int)
     """
-    # Charger le fichier audio avec sa fréquence d'échantillonnage native
+    # Load the audio file with its native sample rate
     audio_signal, sample_rate = librosa.load(file_path, sr=None)
     
-    # Calculer la transformée de Fourier à court terme (STFT)
+    # Compute the Short-Time Fourier Transform (STFT)
     spectrogram = librosa.stft(audio_signal)
     spectrogram_db = librosa.amplitude_to_db(abs(spectrogram))
     
-    # Retourner les valeurs du spectrogramme et la fréquence d'échantillonnage
+    # Return the spectrogram and the sample rate
     return spectrogram_db, sample_rate
 
 
 def definir_threshold_par_echelle(spectrogram_db: np.ndarray, fraction: float = 0.1) -> float:
     """
-    Définit un seuil en dB en fonction de l'échelle des valeurs du spectrogramme.
+    Defines a dB threshold based on the scale of spectrogram values.
 
     Parameters:
-    spectrogram_db (numpy.ndarray): Spectrogramme en dB.
-    fraction (float): Fraction de la plage d'amplitude pour définir le seuil (entre 0 et 1).
+    spectrogram_db (numpy.ndarray): Spectrogram in dB.
+    fraction (float): Fraction of the amplitude range to define the threshold (between 0 and 1).
 
     Returns:
-    float: Seuil en dB basé sur une fraction de l'échelle des amplitudes.
+    float: Threshold in dB based on a fraction of the amplitude scale.
     """
-    # Trouver les valeurs minimale et maximale du spectrogramme
+    # Find the minimum and maximum values in the spectrogram
     max_value = np.max(spectrogram_db)
     min_value = np.min(spectrogram_db)
     
-    # Calculer le seuil basé sur une fraction de l'échelle, au-dessus de la valeur minimale
+    # Calculate the threshold based on a fraction of the range, above the minimum value
     threshold_db = min_value + fraction * (max_value - min_value)
     
     return threshold_db
@@ -70,35 +69,35 @@ def definir_threshold_par_echelle(spectrogram_db: np.ndarray, fraction: float = 
 
 def quantifier_distribution_points_par_freq(spectrogram_db: np.ndarray, sample_rate: int, threshold_db: float, percentiles: list[int] = [25, 50, 75, 90]) -> dict[int, float]:
     """
-    Quantifie la distribution des points présents dans le spectrogramme par rapport aux fréquences.
+    Quantifies the distribution of significant points in the spectrogram relative to frequencies.
 
     Parameters:
-    spectrogram_db (numpy.ndarray): Spectrogramme en dB.
-    sample_rate (int): Fréquence d'échantillonnage.
-    threshold_db (float): Seuil dB pour considérer qu'une valeur est significative (utilisé pour filtrer le bruit).
-    percentiles (list): Liste des percentiles à calculer (entre 0 et 100).
+    spectrogram_db (numpy.ndarray): Spectrogram in dB.
+    sample_rate (int): Sampling rate.
+    threshold_db (float): dB threshold for considering a value significant (used to filter noise).
+    percentiles (list): List of percentiles to calculate (between 0 and 100).
 
     Returns:
-    dict: Dictionnaire où chaque percentile est associé à une fréquence (en Hz).
+    dict: Dictionary where each percentile is associated with a frequency (in Hz).
     """
-    # Obtenir le nombre total de bins de fréquence et de temps
+    # Get the total number of frequency bins and time frames
     num_freq_bins, num_time_frames = spectrogram_db.shape
 
-    # Calculer le nombre de fenêtres temporelles où chaque fréquence a une valeur significative
+    # Calculate the number of time windows where each frequency has a significant value
     significant_counts = np.sum(spectrogram_db > threshold_db, axis=1)
 
-    # Calculer les fréquences associées aux bins
+    # Calculate the frequencies associated with the bins
     freqs = np.linspace(0, sample_rate / 2, num_freq_bins)
 
-    # Normaliser les comptages pour avoir une distribution cumulative entre 0 et 1
+    # Normalize the counts to create a cumulative distribution between 0 and 1
     cumulative_counts = np.cumsum(significant_counts)
     cumulative_counts_normalized = cumulative_counts / cumulative_counts[-1]
 
-    # Calculer les fréquences correspondant aux percentiles
+    # Calculate the frequencies corresponding to the percentiles
     frequency_percentiles = {}
 
     for p in percentiles:
-        # Trouver l'indice où le cumul des comptages atteint ou dépasse le percentile donné
+        # Find the index where the cumulative counts reach or exceed the given percentile
         index = np.argmax(cumulative_counts_normalized >= p / 100.0)
         frequency_percentiles[p] = freqs[index]
 
@@ -106,28 +105,27 @@ def quantifier_distribution_points_par_freq(spectrogram_db: np.ndarray, sample_r
 
 def transformer_quantiles_en_dataframe(titles_quantiles_dict: dict[str, dict[int, float]]) -> pd.DataFrame:
     """
-    Transforme un dictionnaire de quantiles de fréquences pour chaque fichier audio en un DataFrame.
+    Transforms a dictionary of frequency quantiles for each audio file into a DataFrame.
 
     Parameters:
-    titles_quantiles_dict (dict): Dictionnaire où chaque clé est un titre de fichier et chaque valeur est un 
-                                  autre dictionnaire des quantiles associés (ex: {25: freq, 50: freq, ...}).
+    titles_quantiles_dict (dict): Dictionary where each key is a file title, and each value is another dictionary of associated quantiles (e.g., {25: freq, 50: freq, ...}).
 
     Returns:
-    pandas.DataFrame: DataFrame avec chaque titre en ligne et les quantiles comme colonnes, arrondis à l'entier le plus proche.
+    pandas.DataFrame: DataFrame with each title as a row and quantiles as columns, rounded to the nearest integer.
     """
-    # Créer une liste des titres (fichiers audio)
+    # Create a list of file titles
     titles = list(titles_quantiles_dict.keys())
     
-    # Créer une liste des dictionnaires de quantiles (chaque entrée est pour un titre)
+    # Create a list of quantile dictionaries (each entry is for a title)
     quantiles_data = [titles_quantiles_dict[title] for title in titles]
     
-    # Transformer en DataFrame
+    # Convert to DataFrame
     df = pd.DataFrame(quantiles_data, index=titles)
     
-    # Renommer l'index pour qu'il indique le nom des fichiers
-    df.index.name = "Titre du fichier"
+    # Rename the index to indicate the file names
+    df.index.name = "File Title"
     
-    # Convertir les valeurs en entiers
+    # Convert the values to integers
     df = df.astype(int)
 
     return df
@@ -135,113 +133,113 @@ def transformer_quantiles_en_dataframe(titles_quantiles_dict: dict[str, dict[int
 
 def analyser_points_rupture(df_quantiles: pd.DataFrame) -> pd.DataFrame:
     """
-    Analyse le DataFrame des quantiles pour identifier les points de rupture en utilisant la première et la deuxième dérivée.
-    Retourne un DataFrame contenant six colonnes : "Threshold Dérivée 1", "Second Threshold Dérivée 1", "Third Threshold Dérivée 1",
-    "Threshold Dérivée 2", "Second Threshold Dérivée 2", et "Third Threshold Dérivée 2".
+    Analyzes the quantiles DataFrame to identify breakpoints using the first and second derivatives.
+    Returns a DataFrame with six columns: "First Derivative Threshold", "Second Threshold First Derivative", "Third Threshold First Derivative",
+    "Second Derivative Threshold", "Second Threshold Second Derivative", and "Third Threshold Second Derivative".
 
     Parameters:
-    df_quantiles (pandas.DataFrame): DataFrame contenant les quantiles de fréquences pour chaque fichier audio.
+    df_quantiles (pandas.DataFrame): DataFrame containing the frequency quantiles for each audio file.
 
     Returns:
-    pandas.DataFrame: DataFrame avec six colonnes indiquant les quantiles sélectionnés par les points de rupture des dérivées 1 et 2, ainsi que les deuxièmes et troisièmes points les plus hauts.
+    pandas.DataFrame: DataFrame with six columns indicating the quantiles selected by the first and second derivative breakpoints, along with the second and third highest points.
     """
-    # Calculer la première différence (dérivée 1)
+    # Calculate the first difference (first derivative)
     first_diff = df_quantiles.diff(axis=1)
 
-    # Calculer la deuxième différence (dérivée 2)
+    # Calculate the second difference (second derivative)
     second_diff = first_diff.diff(axis=1)
 
-    # Créer un DataFrame vide pour stocker les résultats
+    # Create an empty DataFrame to store the results
     df_thresholds = pd.DataFrame(index=df_quantiles.index)
 
-    # Calculer le seuil pour la première dérivée (point maximum)
+    # Calculate the threshold for the first derivative (maximum point)
     max_first_diff_idx = first_diff.idxmax(axis=1)
-    df_thresholds['Threshold Dérivée 1'] = max_first_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
+    df_thresholds['First Derivative Threshold'] = max_first_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
 
-    # Calculer le deuxième point le plus haut pour la première dérivée
+    # Calculate the second-highest point for the first derivative
     second_max_first_diff_idx = first_diff.apply(lambda row: row.nlargest(2).idxmin(), axis=1)
-    df_thresholds['Second Threshold Dérivée 1'] = second_max_first_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
+    df_thresholds['Second Threshold First Derivative'] = second_max_first_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
 
-    # Calculer le troisième point le plus haut pour la première dérivée
+    # Calculate the third-highest point for the first derivative
     third_max_first_diff_idx = first_diff.apply(lambda row: row.nlargest(3).idxmin(), axis=1)
-    df_thresholds['Third Threshold Dérivée 1'] = third_max_first_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
+    df_thresholds['Third Threshold First Derivative'] = third_max_first_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
 
-    # Calculer le seuil pour la deuxième dérivée (point maximum)
+    # Calculate the threshold for the second derivative (maximum point)
     max_second_diff_idx = second_diff.idxmax(axis=1)
-    df_thresholds['Threshold Dérivée 2'] = max_second_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
+    df_thresholds['Second Derivative Threshold'] = max_second_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
 
-    # Calculer le deuxième point le plus haut pour la deuxième dérivée
+    # Calculate the second-highest point for the second derivative
     second_max_second_diff_idx = second_diff.apply(lambda row: row.nlargest(2).idxmin(), axis=1)
-    df_thresholds['Second Threshold Dérivée 2'] = second_max_second_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
+    df_thresholds['Second Threshold Second Derivative'] = second_max_second_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
 
-    # Calculer le troisième point le plus haut pour la deuxième dérivée
+    # Calculate the third-highest point for the second derivative
     third_max_second_diff_idx = second_diff.apply(lambda row: row.nlargest(3).idxmin(), axis=1)
-    df_thresholds['Third Threshold Dérivée 2'] = third_max_second_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
+    df_thresholds['Third Threshold Second Derivative'] = third_max_second_diff_idx.apply(lambda x: df_quantiles.columns[df_quantiles.columns.get_loc(x) - 1] if df_quantiles.columns.get_loc(x) > 0 else df_quantiles.columns[0])
 
     return df_thresholds
 
 
 def extract_average_significant_quantiles(df_quantiles: pd.DataFrame, df_rupture_threshold: pd.DataFrame) -> pd.Series:
     """
-    Extrait la moyenne des quantiles significatifs de df_quantiles basés sur les seuils identifiés dans df_rupture_threshold.
+    Extracts the average significant quantiles from df_quantiles based on the thresholds identified in df_rupture_threshold.
 
     Parameters:
-    df_quantiles (pandas.DataFrame): DataFrame contenant les quantiles de fréquences pour chaque fichier audio.
-    df_rupture_threshold (pandas.DataFrame): DataFrame contenant les quantiles sélectionnés par les points de rupture.
+    df_quantiles (pandas.DataFrame): DataFrame containing the frequency quantiles for each audio file.
+    df_rupture_threshold (pandas.DataFrame): DataFrame containing the quantiles selected by the breakpoint analysis.
 
     Returns:
-    pandas.Series: Série contenant la moyenne des quantiles significatifs pour chaque fichier audio.
+    pandas.Series: Series containing the average significant quantiles for each audio file.
     """
-    # Initialiser un dictionnaire pour stocker la moyenne des quantiles significatifs
+    # Initialize a dictionary to store the average significant quantiles
     average_quantiles_dict = {}
 
     for index, row in df_rupture_threshold.iterrows():
-        # Extraire les colonnes correspondant aux quantiles identifiés
+        # Extract the columns corresponding to the identified quantiles
         quantiles_list = []
         
         for col in row:
             if col in df_quantiles.columns:
                 quantiles_list.append(df_quantiles.at[index, col])
         
-        # Calculer la moyenne des quantiles extraits
+        # Calculate the average of the extracted quantiles
         if quantiles_list:
             average_quantiles_dict[index] = np.mean(quantiles_list)
         else:
-            average_quantiles_dict[index] = np.nan  # Si aucune valeur n'a été extraite
+            average_quantiles_dict[index] = np.nan  # If no values were extracted
 
-    # Transformer le dictionnaire en une série
-    average_quantiles_series = pd.Series(average_quantiles_dict, name="Moyenne des quantiles significatifs")
+    # Convert the dictionary to a Series
+    average_quantiles_series = pd.Series(average_quantiles_dict, name="Average Significant Quantiles")
 
-    # Renommer l'index pour qu'il indique le nom des fichiers
-    average_quantiles_series.index.name = "Titre du fichier"
+    # Rename the index to indicate the file names
+    average_quantiles_series.index.name = "File Title"
 
     return average_quantiles_series
 
 
 def calculate_degradation_score(average_quantiles_series: pd.Series, reference_value: float = 22000, title_order: bool = False) -> pd.Series:
     """
-    Calcule le score de dégradation en comparant chaque moyenne des quantiles avec une valeur de référence.
+    Calculates the degradation score by comparing each average quantile with a reference value.
 
     Parameters:
-    average_quantiles_series (pandas.Series): Série contenant la moyenne des quantiles significatifs pour chaque fichier audio.
-    reference_value (float): Valeur de référence à utiliser pour calculer la différence en pourcentage.
-    title_order (bool): Si True, trie par ordre alphabétique des titres. Sinon, trie par valeur décroissante.
+    average_quantiles_series (pandas.Series): Series containing the average significant quantiles for each audio file.
+    reference_value (float): Reference value to calculate the percentage difference.
+    title_order (bool): If True, sorts by file title alphabetically. Otherwise, sorts by decreasing value.
 
     Returns:
-    pandas.Series: Série contenant le score de dégradation pour chaque fichier audio, triée selon le paramètre title_order.
+    pandas.Series: Series containing the degradation score for each audio file, sorted according to the title_order parameter.
     """
-    # Calculer la différence en pourcentage par rapport à la valeur de référence
+    # Calculate the percentage difference from the reference value
     percentage_diff = ((average_quantiles_series - reference_value) / reference_value) * 100
 
-    # Appliquer les conditions pour le score de dégradation
+    # Apply the conditions for the degradation score
     degradation_score = percentage_diff.apply(lambda x: 0 if x >= 0 else abs(x))
 
     degradation_score_rounded = degradation_score.round(2)
 
-    # Renommer la série pour indiquer qu'elle contient le score de dégradation
+    # Rename the series to indicate it contains the degradation score
     degradation_score_rounded.name = "Degradation Score"
 
-    # Trier la série selon le paramètre title_order
+    # Sort the series based on the title_order parameter
     if title_order:
         degradation_score_sorted = degradation_score_rounded.sort_index(ascending=True)
     else:
@@ -252,47 +250,47 @@ def calculate_degradation_score(average_quantiles_series: pd.Series, reference_v
 
 def analyser_fichiers_audio(audio_file_paths: str, fraction: float = 0.1, percentiles: list[int] = [80, 81, 82, 83, 84, 85, 86, 87, 88 ,89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99]) -> pd.DataFrame:
     """
-    Parcourt les fichiers audio dans un répertoire, calcule les spectrogrammes et les quantiles de fréquences, 
-    et retourne un DataFrame avec chaque fichier audio et les quantiles associés.
+    Iterates through the audio files in a directory, calculates the spectrograms and frequency quantiles, 
+    and returns a DataFrame with each audio file and its associated quantiles.
 
     Parameters:
-    audio_file_paths (str): Chemin vers le répertoire contenant les fichiers audio.
-    fraction (float): Fraction de la plage d'amplitude pour définir le seuil (entre 0 et 1).
-    percentiles (list): Liste des percentiles à calculer (entre 0 et 100).
+    audio_file_paths (str): Paths to the directory containing audio files.
+    fraction (float): Fraction of the amplitude range to define the threshold (between 0 and 1).
+    percentiles (list): List of percentiles to calculate (between 0 and 100).
 
     Returns:
-    pandas.DataFrame: DataFrame contenant les titres des fichiers audio et les quantiles associés.
+    pandas.DataFrame: DataFrame containing the file titles and the associated quantiles.
     """
 
-    # Dictionnaire pour stocker les quantiles de chaque fichier
+    # Dictionary to store quantiles for each file
     titles_quantiles_dict = {}
 
-    # Parcourir les fichiers audio
+    # Iterate through audio files
     for file_path in audio_file_paths:
 
         filename = os.path.basename(file_path)
 
-        # Calculer les valeurs du spectrogramme
+        # Calculate the spectrogram values
         spectrogram_db, sample_rate = calculate_audio_spectrogram(file_path)
 
-        # Définir le seuil automatiquement en fonction de l'échelle
+        # Define the threshold automatically based on the scale
         threshold_db_value = definir_threshold_par_echelle(spectrogram_db, fraction=fraction)
 
-        # Quantifier les fréquences correspondant aux percentiles de distribution des points
+        # Quantify the frequencies corresponding to the percentiles of the point distribution
         frequency_percentiles = quantifier_distribution_points_par_freq(spectrogram_db, sample_rate, threshold_db=threshold_db_value, percentiles=percentiles)
 
-        # Ajouter les quantiles au dictionnaire, avec le nom du fichier comme clé
+        # Add the quantiles to the dictionary, using the file name as the key
         titles_quantiles_dict[filename] = frequency_percentiles
 
-    # Transformer le dictionnaire en DataFrame
+    # Convert the dictionary into a DataFrame
     df_quantiles = transformer_quantiles_en_dataframe(titles_quantiles_dict)
 
     df_rupture_treshold = analyser_points_rupture(df_quantiles)
 
-    # Utiliser la nouvelle fonction pour extraire les quantiles significatifs
+    # Use the new function to extract the significant quantiles
     average_quantiles_per_title = extract_average_significant_quantiles(df_quantiles, df_rupture_treshold)
 
-    # Utiliser la nouvelle fonction pour calculer le score de dégradation pour chaque titre
+    # Use the new function to calculate the degradation score for each title
     degradation_score_per_title = calculate_degradation_score(average_quantiles_per_title)
 
     return degradation_score_per_title
@@ -300,36 +298,35 @@ def analyser_fichiers_audio(audio_file_paths: str, fraction: float = 0.1, percen
 
 def plot_spectrogram(spectrogram_db: np.ndarray, sample_rate: int, filename: str) -> None:
     """
-    Affiche un spectrogramme d'un fichier audio.
+    Displays a spectrogram of an audio file.
 
     Parameters:
-    spectrogram_db (numpy.ndarray): Spectrogramme en dB.
-    sample_rate (int): Fréquence d'échantillonnage.
-    audio_directory (str): Répertoire contenant le fichier audio.
-    filename (str): Nom du fichier audio.
+    spectrogram_db (numpy.ndarray): Spectrogram in dB.
+    sample_rate (int): Sampling rate.
+    filename (str): Name of the audio file.
     """
 
-    # Visualiser le spectrogramme
-    plt.figure(figsize=(10, 6), facecolor='black')  # Fenêtre avec fond noir
+    # Visualize the spectrogram
+    plt.figure(figsize=(10, 6), facecolor='black')  # Window with a black background
     ax = plt.gca()
     
     librosa.display.specshow(spectrogram_db, sr=sample_rate, x_axis='time', y_axis='hz', cmap=custom_cmap)
     cbar = plt.colorbar(format="%+2.0f dB", cmap=custom_cmap)
-    cbar.ax.yaxis.set_tick_params(color='white')  # Changer la couleur des graduations de la barre de couleurs
-    plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')  # Changer la couleur des étiquettes de la barre de couleurs
+    cbar.ax.yaxis.set_tick_params(color='white')  # Change the color of the colorbar ticks
+    plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')  # Change the color of the colorbar labels
 
-    # Configuration des titres et étiquettes
+    # Configure titles and labels
     plt.title(f"{filename}", color='white')
-    plt.xlabel("Temps (s)", color='white')
-    plt.ylabel("Fréquence (Hz)", color='white')
+    plt.xlabel("Time (s)", color='white')
+    plt.ylabel("Frequency (Hz)", color='white')
     plt.xticks(color='white')
     plt.yticks(color='white')
 
-    # Ajouter un contour blanc autour du graphique
+    # Add a white outline around the plot
     for spine in ax.spines.values():
         spine.set_edgecolor('white')
 
-    # Ajouter un contour blanc autour de la barre de couleurs
+    # Add a white outline around the colorbar
     cbar.outline.set_edgecolor('white')
 
     plt.tight_layout()
@@ -339,48 +336,48 @@ def plot_spectrogram(spectrogram_db: np.ndarray, sample_rate: int, filename: str
 def analyse_and_plot(audio_directory: str, filename: str, filename_2: str,
                      calculate_degradation: bool = False, plot_spectrogram_1: bool = False, plot_spectrogram_2: bool = False) -> None:
     """
-    Fusionne les fonctions pour calculer le score de dégradation et afficher les spectrogrammes.
+    Merges functions to calculate the degradation score and display spectrograms.
 
     Parameters:
-    audio_directory (str): Répertoire contenant les fichiers audio.
-    filename (str): Nom du premier fichier audio.
-    filename_2 (str): Nom du second fichier audio.
-    calculate_degradation (bool): Si True, calcule et affiche le score de dégradation pour chaque fichier audio.
-    plot_spectrogram_1 (bool): Si True, affiche le spectrogramme du premier fichier.
-    plot_spectrogram_2 (bool): Si True, affiche le spectrogramme du second fichier.
+    audio_directory (str): Directory containing the audio files.
+    filename (str): Name of the first audio file.
+    filename_2 (str): Name of the second audio file.
+    calculate_degradation (bool): If True, calculates and displays the degradation score for each audio file.
+    plot_spectrogram_1 (bool): If True, displays the spectrogram for the first file.
+    plot_spectrogram_2 (bool): If True, displays the spectrogram for the second file.
     """
-    # Créer les chemins complets des fichiers
+    # Create the full paths of the files
     audio_file_paths = get_audio_file_paths(audio_directory)
     file_path_1 = os.path.join(audio_directory, filename)
     file_path_2 = os.path.join(audio_directory, filename_2)
 
-    # Calculer et afficher le score de dégradation si demandé
+    # Calculate and display the degradation score if requested
     if calculate_degradation:
         degradation_score_per_title = analyser_fichiers_audio(audio_file_paths)
         print(degradation_score_per_title)
 
-    # Afficher le spectrogramme du premier fichier si demandé
+    # Display the spectrogram for the first file if requested
     if plot_spectrogram_1:
         spectrogram_db_1, sample_rate_1 = calculate_audio_spectrogram(file_path_1)
         plot_spectrogram(spectrogram_db_1, sample_rate_1, filename)
 
-    # Afficher le spectrogramme du second fichier si demandé
+    # Display the spectrogram for the second file if requested
     if plot_spectrogram_2:
         spectrogram_db_2, sample_rate_2 = calculate_audio_spectrogram(file_path_2)
         plot_spectrogram(spectrogram_db_2, sample_rate_2, filename_2)
 
     
-# Colormap personnalisée
-colors = ["#000000", "#0000FF", "#008000", "#FFFF00", "#FF0000"]  # Noir, Bleu, Vert, Jaune, Rouge
+# Custom colormap
+colors = ["#000000", "#0000FF", "#008000", "#FFFF00", "#FF0000"]  # Black, Blue, Green, Yellow, Red
 custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors, N=256)
 
-# Répertoire contenant les fichiers audio
+# Directory containing the audio files
 audio_directory = 'D:\\MusicDJ'
 filename = 'Grupo La Cumbia - Cumbia Buena (Intro) 95.mp3'
 filename_2 = 'Watussi Jowell Y Randy Nengo Flow - Dale Pal Piso Dj Matt Break Acapella Hype Outro 96.mp3'
 
 
-# Exemple d'utilisation de la fonction fusionnée
+# Example of using the merged function
 analyse_and_plot(
     audio_directory=audio_directory,
     filename=filename,
