@@ -1,3 +1,3 @@
-from .main import analyse_and_plot
+from .main import analyze_audio_file
 
-__all__ = ["analyse_and_plot"]
+__all__ = ["analyze_audio_file"]
