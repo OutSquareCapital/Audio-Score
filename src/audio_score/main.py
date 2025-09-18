@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+from typing import Any
 
 import librosa
 import librosa.display
@@ -6,30 +8,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
+from numpy.typing import NDArray
 
 
 def get_audio_file_paths(audio_directory: str) -> list[str]:
-    """
-    Generates the full paths of all audio files in a directory.
-
-    Parameters:
-    audio_directory (str): Path to the directory containing audio files.
-
-    Returns:
-    list[str]: List of full paths to audio files (mp3, wav, flac).
-    """
-    # Iterate through the audio files in the directory and create a list of full paths
+    audio_dir = Path(audio_directory)
     audio_file_paths = [
-        os.path.join(audio_directory, filename)
-        for filename in os.listdir(audio_directory)
-        if filename.endswith(".mp3")
-        or filename.endswith(".wav")
-        or filename.endswith(".flac")
+        str(file_path)
+        for file_path in audio_dir.iterdir()
+        if file_path.suffix.lower() in (".mp3", ".wav", ".flac")
     ]
     return audio_file_paths
 
 
-def calculate_audio_spectrogram(file_path: str) -> tuple[np.ndarray, int]:
+def calculate_audio_spectrogram(file_path: str) -> tuple[NDArray[Any], int]:
     """
     Loads an audio file and calculates its spectrogram in dB.
 
@@ -50,7 +42,9 @@ def calculate_audio_spectrogram(file_path: str) -> tuple[np.ndarray, int]:
     return spectrogram_db, sample_rate
 
 
-def set_threshold_by_scale(spectrogram_db: np.ndarray, fraction: float = 0.1) -> float:
+def set_threshold_by_scale(
+    spectrogram_db: NDArray[Any], fraction: float = 0.1
+) -> float:
     """
     Defines a dB threshold based on the scale of spectrogram values.
 
@@ -72,10 +66,10 @@ def set_threshold_by_scale(spectrogram_db: np.ndarray, fraction: float = 0.1) ->
 
 
 def quantify_distribution_points_by_frequency(
-    spectrogram_db: np.ndarray,
+    spectrogram_db: NDArray[Any],
     sample_rate: int,
     threshold_db: float,
-    percentiles: list[int] = [25, 50, 75, 90],
+    percentiles: list[int],
 ) -> dict[int, float]:
     """
     Quantifies the distribution of significant points in the spectrogram relative to frequencies.
@@ -311,30 +305,7 @@ def calculate_degradation_score(
 
 
 def analyze_audio_files(
-    audio_file_paths: str,
-    fraction: float = 0.1,
-    percentiles: list[int] = [
-        80,
-        81,
-        82,
-        83,
-        84,
-        85,
-        86,
-        87,
-        88,
-        89,
-        90,
-        91,
-        92,
-        93,
-        94,
-        95,
-        96,
-        97,
-        98,
-        99,
-    ],
+    audio_file_paths: list[str], percentiles: list[int], fraction: float = 0.1
 ) -> pd.DataFrame:
     """
     Iterates through the audio files in a directory, calculates the spectrograms and frequency quantiles,
@@ -383,16 +354,22 @@ def analyze_audio_files(
         df_quantiles, df_rupture_treshold
     )
 
-    # Use the new function to calculate the degradation score for each title
-    degradation_score_per_title = calculate_degradation_score(
-        average_quantiles_per_title
-    )
+    return calculate_degradation_score(average_quantiles_per_title)
 
-    return degradation_score_per_title
+
+# Custom colormap
+COLORS = [
+    "#000000",
+    "#0000FF",
+    "#008000",
+    "#FFFF00",
+    "#FF0000",
+]  # Black, Blue, Green, Yellow, Red
+CUSTOM_CMAP = LinearSegmentedColormap.from_list("custom_cmap", COLORS, N=256)
 
 
 def plot_spectrogram(
-    spectrogram_db: np.ndarray, sample_rate: int, filename: str
+    spectrogram_db: NDArray[Any], sample_rate: int, filename: str
 ) -> None:
     """
     Displays a spectrogram of an audio file.
@@ -408,9 +385,9 @@ def plot_spectrogram(
     ax = plt.gca()
 
     librosa.display.specshow(
-        spectrogram_db, sr=sample_rate, x_axis="time", y_axis="hz", cmap=custom_cmap
+        spectrogram_db, sr=sample_rate, x_axis="time", y_axis="hz", cmap=CUSTOM_CMAP
     )
-    cbar = plt.colorbar(format="%+2.0f dB", cmap=custom_cmap)
+    cbar = plt.colorbar(format="%+2.0f dB", cmap=CUSTOM_CMAP)
     cbar.ax.yaxis.set_tick_params(
         color="white"
     )  # Change the color of the colorbar ticks
@@ -462,7 +439,9 @@ def analyse_and_plot(
 
     # Calculate and display the degradation score if requested
     if calculate_degradation:
-        degradation_score_per_title = analyze_audio_files(audio_file_paths)
+        degradation_score_per_title = analyze_audio_files(
+            audio_file_paths, percentiles=[25, 50, 75, 90]
+        )
         print(degradation_score_per_title)
 
     # Display the spectrogram for the first file if requested
@@ -474,30 +453,3 @@ def analyse_and_plot(
     if plot_spectrogram_2:
         spectrogram_db_2, sample_rate_2 = calculate_audio_spectrogram(file_path_2)
         plot_spectrogram(spectrogram_db_2, sample_rate_2, filename_2)
-
-
-# Custom colormap
-colors = [
-    "#000000",
-    "#0000FF",
-    "#008000",
-    "#FFFF00",
-    "#FF0000",
-]  # Black, Blue, Green, Yellow, Red
-custom_cmap = LinearSegmentedColormap.from_list("custom_cmap", colors, N=256)
-
-# Directory containing the audio files
-audio_directory = "D:\\MusicDJ"
-filename = "Grupo La Cumbia - Cumbia Buena (Intro) 95.mp3"
-filename_2 = "Watussi Jowell Y Randy Nengo Flow - Dale Pal Piso Dj Matt Break Acapella Hype Outro 96.mp3"
-
-
-# Example of using the merged function
-analyse_and_plot(
-    audio_directory=audio_directory,
-    filename=filename,
-    filename_2=filename_2,
-    calculate_degradation=True,
-    plot_spectrogram_1=False,
-    plot_spectrogram_2=False,
-)

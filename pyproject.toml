@@ -6,7 +6,12 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "librosa>=0.11.0",
-    "matplotlib>=3.10.6",
     "numpy>=2.2.6",
+    "pandas>=2.3.2",
+    "plotly>=6.3.0",
     "polars>=1.33.1",
+    "plotly-stubs @ git+https://github.com/OutSquareCapital/plotly-stubs.git@refactor-frame-types",
 ]
+[build-system]
+requires = ["uv_build>=0.8.15,<0.9.0"]
+build-backend = "uv_build"
