@@ -15,16 +15,19 @@ The higher the score, the worse the quality.
 ## Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/your-username/audio-file-analyzer.git
    ```
 
 2. Navigate to the project directory:
+
    ```bash
    cd audio-file-analyzer
    ```
 
 3. Install the required dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -40,6 +43,7 @@ The following Python libraries are required:
 - `os`
 
 To install them, use:
+
 ```bash
 pip install numpy librosa matplotlib pandas
 ```
@@ -62,6 +66,7 @@ analyse_and_plot(
 ```
 
 #### Example
+
 ```python
 analyse_and_plot(
     audio_directory='D:\MusicDJ',
@@ -88,6 +93,7 @@ analyse_and_plot(
 ### 3. Custom Colormap
 
 The script uses a custom colormap for spectrogram visualization:
+
 ```python
 colors = ["#000000", "#0000FF", "#008000", "#FFFF00", "#FF0000"]  # Black, Blue, Green, Yellow, Red
 ```
